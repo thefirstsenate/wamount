@@ -1,3 +1,6 @@
+// Suppress codecvt deprecation warning in C++17
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include "winfsp_ops.h"
 #include "../apfs/volume.h"
 #include "../utils/logging.h"
@@ -56,7 +59,7 @@ bool WinFspAPFS::mount(const std::wstring& mount_point) {
     Interface.GetFileInfo = GetFileInfo;
 
     NTSTATUS Result = FspFileSystemCreate(
-        (PWSTR)L"" WINFSP_TARGET_NAME "",
+        L"",
         &VolumeParams,
         &Interface,
         &file_system_);

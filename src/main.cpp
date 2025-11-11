@@ -1,3 +1,6 @@
+// Suppress codecvt deprecation warning in C++17
+#define _SILENCE_CXX17_CODECVT_HEADER_DEPRECATION_WARNING
+
 #include "apfs/container.h"
 #include "apfs/volume.h"
 #include "winfsp/winfsp_ops.h"
