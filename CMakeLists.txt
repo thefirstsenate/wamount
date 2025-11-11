@@ -69,7 +69,7 @@ add_executable(wamount ${SOURCES} ${HEADERS})
 
 # Link WinFsp
 target_link_libraries(wamount
-    winfsp-x64.dll
+    winfsp-x64
 )
 
 # Compiler flags

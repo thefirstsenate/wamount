@@ -34,13 +34,54 @@ jobs:
         Write-Host "Installing WinFsp..."
         Start-Process msiexec.exe -ArgumentList "/i", $winfspInstaller, "/qn", "/norestart" -Wait
 
-        Write-Host "WinFsp installed successfully"
+        Write-Host "Verifying WinFsp installation..."
+
+        # Check possible installation paths
+        $possiblePaths = @(
+          "C:\Program Files (x86)\WinFsp",
+          "C:\Program Files\WinFsp"
+        )
+
+        $winfspPath = $null
+        foreach ($path in $possiblePaths) {
+          if (Test-Path $path) {
+            $winfspPath = $path
+            Write-Host "✅ Found WinFsp at: $path"
+            break
+          }
+        }
+
+        if (-not $winfspPath) {
+          Write-Host "❌ WinFsp installation not found!"
+          Write-Host "Checked paths:"
+          foreach ($path in $possiblePaths) {
+            Write-Host "  - $path"
+          }
+          exit 1
+        }
+
+        # Verify required directories exist
+        $requiredDirs = @("inc", "lib", "bin")
+        foreach ($dir in $requiredDirs) {
+          $dirPath = Join-Path $winfspPath $dir
+          if (-not (Test-Path $dirPath)) {
+            Write-Host "❌ Missing required directory: $dirPath"
+            exit 1
+          }
+          Write-Host "✅ Found: $dirPath"
+        }
+
+        # Save path for next step
+        echo "WINFSP_PATH=$winfspPath" >> $env:GITHUB_ENV
+        Write-Host "`n✅ WinFsp installed successfully at: $winfspPath"
 
     - name: Configure CMake
+      shell: pwsh
       run: |
+        Write-Host "Configuring with WinFsp path: $env:WINFSP_PATH"
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -A x64 -DWINFSP_PATH="C:\Program Files (x86)\WinFsp" ..
+        cmake -G "Visual Studio 17 2022" -A x64 -DWINFSP_PATH="$env:WINFSP_PATH" ..
 
     - name: Build
       run: |
