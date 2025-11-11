@@ -1,0 +1,218 @@
+name: Release WAMount
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Get version
+      id: get_version
+      shell: pwsh
+      run: |
+        if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+          $version = "${{ github.event.inputs.version }}"
+        } else {
+          $version = "${{ github.ref_name }}"
+        }
+        echo "version=$version" >> $env:GITHUB_OUTPUT
+        echo "Version: $version"
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install WinFsp
+      shell: pwsh
+      run: |
+        Write-Host "Downloading WinFsp..."
+        $winfspUrl = "https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi"
+        $winfspInstaller = "$env:TEMP\winfsp.msi"
+        Invoke-WebRequest -Uri $winfspUrl -OutFile $winfspInstaller
+
+        Write-Host "Installing WinFsp..."
+        Start-Process msiexec.exe -ArgumentList "/i", $winfspInstaller, "/qn", "/norestart" -Wait
+
+        Write-Host "Verifying WinFsp installation..."
+        if (Test-Path "C:\Program Files (x86)\WinFsp") {
+          Write-Host "✅ WinFsp installed successfully"
+        } else {
+          Write-Host "❌ WinFsp installation failed"
+          exit 1
+        }
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DWINFSP_PATH="C:\Program Files (x86)\WinFsp" ..
+
+    - name: Build Release
+      run: |
+        cd build
+        cmake --build . --config Release --verbose
+
+    - name: Create release package
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+        $pkgName = "wamount-$version-windows-x64"
+        $pkgDir = "release-package"
+
+        Write-Host "Creating release package: $pkgName"
+
+        New-Item -ItemType Directory -Path $pkgDir -Force | Out-Null
+
+        # Copy executable
+        Copy-Item "build\Release\wamount.exe" "$pkgDir\"
+
+        # Copy documentation
+        Copy-Item "README.md" "$pkgDir\"
+        Copy-Item "QUICKSTART.md" "$pkgDir\"
+        Copy-Item "BUILD.md" "$pkgDir\"
+        Copy-Item "LICENSE" "$pkgDir\"
+        Copy-Item "CHANGELOG.md" "$pkgDir\"
+
+        # Create README for the package
+        @"
+        WAMount $version - Windows Apple Mount
+        =====================================
+
+        This package contains the WAMount executable for mounting APFS partitions on Windows.
+
+        PREREQUISITES:
+        - Windows 10 or 11 (64-bit)
+        - WinFsp 1.12 or later (download from https://winfsp.dev/)
+        - Administrator privileges
+
+        QUICK START:
+        1. Install WinFsp if not already installed
+        2. Open Command Prompt as Administrator
+        3. Run: wamount.exe -m X: \\.\PhysicalDrive#
+           (Replace X: with desired drive letter and # with your disk number)
+
+        DOCUMENTATION:
+        - QUICKSTART.md - Getting started guide
+        - README.md - Full documentation
+        - BUILD.md - Build from source instructions
+
+        For more information, visit: https://github.com/${{ github.repository }}
+
+        License: MIT (see LICENSE file)
+        "@ | Out-File -FilePath "$pkgDir\README.txt" -Encoding UTF8
+
+        # Create ZIP archive
+        Compress-Archive -Path "$pkgDir\*" -DestinationPath "$pkgName.zip" -Force
+
+        Write-Host "✅ Release package created: $pkgName.zip"
+
+        # List contents
+        Write-Host "`nPackage contents:"
+        Get-ChildItem $pkgDir
+
+    - name: Generate release notes
+      shell: pwsh
+      run: |
+        $version = "${{ steps.get_version.outputs.version }}"
+
+        $releaseNotes = @"
+        # WAMount $version
+
+        Windows Apple Mount - Read APFS partitions on Windows 10/11
+
+        ## 📥 Download
+
+        Download ``wamount-$version-windows-x64.zip`` from the Assets section below.
+
+        ## 🚀 Quick Start
+
+        1. **Install WinFsp** (required)
+           - Download from: https://winfsp.dev/rel/
+           - Install ``winfsp-2.0.23075.msi`` or later
+
+        2. **Run WAMount** (as Administrator)
+           ``````cmd
+           wamount.exe -m X: \\.\PhysicalDrive1
+           ``````
+           Replace ``X:`` with desired drive letter and ``1`` with your APFS disk number.
+
+        3. **Access your files**
+           - Open File Explorer
+           - Navigate to the mounted drive
+
+        ## ✨ Features
+
+        - ✅ Read-only APFS volume mounting
+        - ✅ Support for multiple volumes
+        - ✅ User-mode driver (no kernel driver needed)
+        - ✅ Safe and stable
+
+        ## ⚠️ Requirements
+
+        - Windows 10 or 11 (64-bit)
+        - WinFsp 1.12 or later
+        - Administrator privileges
+
+        ## 📋 Limitations
+
+        - Read-only access (no write support)
+        - Unencrypted volumes only
+        - No compression support
+
+        ## 📚 Documentation
+
+        - [Quick Start Guide](QUICKSTART.md)
+        - [Full Documentation](README.md)
+        - [Build Instructions](BUILD.md)
+
+        ## 🐛 Issues?
+
+        Report issues at: https://github.com/${{ github.repository }}/issues
+
+        ## 📝 Changelog
+
+        See [CHANGELOG.md](CHANGELOG.md) for version history and changes.
+
+        ---
+
+        **Full Changelog**: https://github.com/${{ github.repository }}/commits/$version
+        "@
+
+        $releaseNotes | Out-File -FilePath "release-notes.md" -Encoding UTF8
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.version }}
+        name: WAMount ${{ steps.get_version.outputs.version }}
+        body_path: release-notes.md
+        draft: false
+        prerelease: false
+        files: |
+          wamount-${{ steps.get_version.outputs.version }}-windows-x64.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: wamount-release-${{ steps.get_version.outputs.version }}
+        path: |
+          wamount-${{ steps.get_version.outputs.version }}-windows-x64.zip
+          release-notes.md
+        retention-days: 90

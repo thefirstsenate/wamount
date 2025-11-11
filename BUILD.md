@@ -2,6 +2,24 @@
 
 This document provides detailed instructions for building WAMount from source.
 
+## 📥 Don't Want to Build?
+
+**Pre-built binaries are available!** Download the latest release from:
+- [GitHub Releases](https://github.com/thefirstsenate/wamount/releases/latest)
+
+Just download `wamount-vX.X.X-windows-x64.zip`, extract it, and you're ready to go. See [QUICKSTART.md](QUICKSTART.md).
+
+---
+
+## Why Build from Source?
+
+You might want to build from source if you:
+- Want to modify or customize WAMount
+- Need a debug build for troubleshooting
+- Want to contribute to development
+- Prefer building software yourself
+- Need a cutting-edge development version
+
 ## Prerequisites
 
 ### Required Software

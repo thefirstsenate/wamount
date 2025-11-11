@@ -1,0 +1,154 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check file structure
+      run: |
+        echo "📁 Checking project structure..."
+
+        # Required files
+        required_files=(
+          "README.md"
+          "LICENSE"
+          "CMakeLists.txt"
+          "src/main.cpp"
+        )
+
+        missing_files=()
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            missing_files+=("$file")
+          fi
+        done
+
+        if [ ${#missing_files[@]} -gt 0 ]; then
+          echo "❌ Missing required files:"
+          printf '%s\n' "${missing_files[@]}"
+          exit 1
+        fi
+
+        echo "✅ All required files present"
+
+    - name: Check file permissions
+      run: |
+        echo "🔒 Checking file permissions..."
+
+        # Ensure no executable permissions on source files
+        if find src include -type f \( -name "*.cpp" -o -name "*.h" \) -executable | grep -q .; then
+          echo "❌ Source files should not be executable"
+          find src include -type f \( -name "*.cpp" -o -name "*.h" \) -executable
+          exit 1
+        fi
+
+        echo "✅ File permissions OK"
+
+    - name: Check for large files
+      run: |
+        echo "📏 Checking for large files..."
+
+        # Find files larger than 1MB (excluding .git)
+        large_files=$(find . -type f -size +1M ! -path "./.git/*" || true)
+
+        if [ -n "$large_files" ]; then
+          echo "⚠️  Warning: Large files found:"
+          echo "$large_files"
+        else
+          echo "✅ No large files"
+        fi
+
+    - name: Line ending check
+      run: |
+        echo "📝 Checking line endings..."
+
+        # Check for CRLF in source files (should have LF in repo)
+        if find src include -type f \( -name "*.cpp" -o -name "*.h" \) -exec file {} \; | grep -q CRLF; then
+          echo "⚠️  Warning: Found CRLF line endings (Windows style)"
+          echo "   Files will be converted by Git on checkout"
+        fi
+
+        echo "✅ Line endings checked"
+
+    - name: Documentation check
+      run: |
+        echo "📚 Checking documentation..."
+
+        # Check if README has basic sections
+        if ! grep -q "## " README.md; then
+          echo "❌ README.md missing section headers"
+          exit 1
+        fi
+
+        # Check for license mention
+        if ! grep -iq "license" README.md; then
+          echo "⚠️  Warning: No license mention in README"
+        fi
+
+        echo "✅ Documentation OK"
+
+  build-verification:
+    name: Verify Build Succeeds
+    needs: code-quality
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Install WinFsp
+      shell: pwsh
+      run: |
+        $winfspUrl = "https://github.com/winfsp/winfsp/releases/download/v2.0/winfsp-2.0.23075.msi"
+        $winfspInstaller = "$env:TEMP\winfsp.msi"
+        Invoke-WebRequest -Uri $winfspUrl -OutFile $winfspInstaller
+        Start-Process msiexec.exe -ArgumentList "/i", $winfspInstaller, "/qn", "/norestart" -Wait
+
+    - name: Configure and Build
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DWINFSP_PATH="C:\Program Files (x86)\WinFsp" ..
+        cmake --build . --config Release
+
+    - name: Verify executable
+      shell: pwsh
+      run: |
+        if (Test-Path "build\Release\wamount.exe") {
+          $fileInfo = Get-Item "build\Release\wamount.exe"
+          Write-Host "✅ Executable created successfully"
+          Write-Host "   Size: $($fileInfo.Length) bytes"
+          Write-Host "   Path: $($fileInfo.FullName)"
+        } else {
+          Write-Host "❌ Executable not found"
+          exit 1
+        }
+
+  pr-summary:
+    name: PR Summary
+    needs: [code-quality, build-verification]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: PR Success
+      run: |
+        echo "✅ All checks passed!"
+        echo ""
+        echo "📋 Summary:"
+        echo "   ✅ Code quality checks"
+        echo "   ✅ Build verification"
+        echo ""
+        echo "This PR is ready for review."

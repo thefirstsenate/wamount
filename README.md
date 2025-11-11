@@ -1,6 +1,19 @@
 # WAMount - Windows Apple Mount
 
+![Build Status](https://github.com/thefirstsenate/wamount/actions/workflows/build.yml/badge.svg)
+![Release](https://img.shields.io/github/v/release/thefirstsenate/wamount?include_prereleases)
+![License](https://img.shields.io/github/license/thefirstsenate/wamount)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)
+
 WAMount (Windows Apple Mount) is a user-mode filesystem driver that enables mounting and reading APFS (Apple File System) partitions on Windows 10/11.
+
+## 📥 Download
+
+**Pre-built binaries** are available from [GitHub Releases](https://github.com/thefirstsenate/wamount/releases/latest).
+
+Download the latest `wamount-vX.X.X-windows-x64.zip`, extract it, and follow the [Quick Start Guide](QUICKSTART.md).
+
+**Building from source?** See [BUILD.md](BUILD.md) for detailed instructions.
 
 ## Architecture
 
