@@ -2,6 +2,7 @@
 #include "volume.h"
 #include "../utils/logging.h"
 #include <cstring>
+#include <string>
 
 APFSContainer::APFSContainer(std::shared_ptr<DiskReader> disk)
     : disk_(disk), block_size_(0), block_count_(0) {

@@ -7,6 +7,7 @@
 #include <string>
 #include <codecvt>
 #include <locale>
+#include <cstring>
 
 WinFspAPFS::WinFspAPFS(std::shared_ptr<APFSVolume> volume)
     : volume_(volume), file_system_(nullptr) {
@@ -45,8 +46,8 @@ bool WinFspAPFS::mount(const std::wstring& mount_point) {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
     std::wstring vol_name_wide = converter.from_bytes(vol_name);
 
-    wcscpy_s(VolumeParams.FileSystemName, L"APFS");
-    wcsncpy_s(VolumeParams.Prefix, vol_name_wide.c_str(), sizeof(VolumeParams.Prefix) / sizeof(WCHAR) - 1);
+    wcscpy_s(VolumeParams.FileSystemName, sizeof(VolumeParams.FileSystemName) / sizeof(WCHAR), L"APFS");
+    wcsncpy_s(VolumeParams.Prefix, sizeof(VolumeParams.Prefix) / sizeof(WCHAR), vol_name_wide.c_str(), sizeof(VolumeParams.Prefix) / sizeof(WCHAR) - 1);
 
     // Create file system
     FSP_FILE_SYSTEM_INTERFACE Interface = {0};

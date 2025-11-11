@@ -3,6 +3,7 @@
 #include "container.h"
 #include "../utils/logging.h"
 #include <cstring>
+#include <string>
 #include <algorithm>
 
 BTree::BTree(std::shared_ptr<APFSVolume> volume, oid_t root_oid)

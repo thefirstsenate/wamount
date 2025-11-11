@@ -4,6 +4,8 @@
 #include "../utils/logging.h"
 #include <cstring>
 #include <sstream>
+#include <string>
+#include <algorithm>
 
 APFSVolume::APFSVolume(std::shared_ptr<APFSContainer> container, oid_t volume_oid)
     : container_(container), volume_oid_(volume_oid) {
