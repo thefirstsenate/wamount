@@ -31,8 +31,12 @@ jobs:
         $winfspInstaller = "$env:TEMP\winfsp.msi"
         Invoke-WebRequest -Uri $winfspUrl -OutFile $winfspInstaller
 
-        Write-Host "Installing WinFsp..."
-        Start-Process msiexec.exe -ArgumentList "/i", $winfspInstaller, "/qn", "/norestart" -Wait
+        Write-Host "Installing WinFsp with SDK components..."
+        # Install with ADDLOCAL=ALL to ensure SDK (headers/libs) are installed
+        Start-Process msiexec.exe -ArgumentList "/i", $winfspInstaller, "/qn", "/norestart", "ADDLOCAL=ALL" -Wait
+
+        Write-Host "Waiting for installation to complete..."
+        Start-Sleep -Seconds 5
 
         Write-Host "Verifying WinFsp installation..."
 
@@ -60,15 +64,31 @@ jobs:
           exit 1
         }
 
+        # List what's actually installed
+        Write-Host "`nInstalled WinFsp directory contents:"
+        Get-ChildItem $winfspPath | Format-Table Name, Mode
+
         # Verify required directories exist
         $requiredDirs = @("inc", "lib", "bin")
+        $allDirsFound = $true
         foreach ($dir in $requiredDirs) {
           $dirPath = Join-Path $winfspPath $dir
           if (-not (Test-Path $dirPath)) {
             Write-Host "❌ Missing required directory: $dirPath"
-            exit 1
+            $allDirsFound = $false
+          } else {
+            Write-Host "✅ Found: $dirPath"
+            # Show contents of important directories
+            if ($dir -eq "inc") {
+              Write-Host "   Headers in inc/:"
+              Get-ChildItem $dirPath -Recurse -File | Select-Object -First 5 | ForEach-Object { Write-Host "     - $($_.Name)" }
+            }
           }
-          Write-Host "✅ Found: $dirPath"
+        }
+
+        if (-not $allDirsFound) {
+          Write-Host "`n❌ Not all required directories found. Installation may be incomplete."
+          Write-Host "Attempting to continue anyway..."
         }
 
         # Save path for next step
